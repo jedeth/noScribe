@@ -258,10 +258,12 @@ config['locale'] = app_locale
 
 # determine optimal number of threads for faster-whisper (depending on cpu cores)
 if platform.system() == 'Windows':
-    number_threads = get_config('threads', cpufeature.CPUFeature["num_physical_cores"])
+    cpu_count = cpufeature.CPUFeature["num_physical_cores"]
+    number_threads = get_config('threads', cpu_count)
 elif platform.system() == "Linux":
-    number_threads = get_config('threads', os.cpu_count() if os.cpu_count() is not None else 4)
-elif platform.system() == "Darwin": # = MAC
+    cpu_count = os.cpu_count() if os.cpu_count() is not None else 4
+    number_threads = get_config('threads', cpu_count)
+elif platform.system() == "Darwin":  # = MAC
     if platform.machine() == "arm64":
         cpu_count = int(check_output(["sysctl", "-n", "hw.perflevel0.logicalcpu_max"]))
     elif platform.machine() == "x86_64":
@@ -431,6 +433,7 @@ class TranscriptionJob:
         self.timestamps: bool = False
         self.disfluencies: bool = True
         self.pause: int = 0  # index value (0=none, 1=1sec+, etc.)
+        self.threads: int = 4
         
         # Config-based options
         self.whisper_beam_size: int = 1
@@ -650,7 +653,7 @@ class TranscriptionQueue:
 def create_transcription_job(audio_file=None, transcript_file=None, start_time=None, stop_time=None,
                            language_name=None, whisper_model_name=None, speaker_detection=None,
                            overlapping=None, timestamps=None, disfluencies=None, pause=None,
-                           cli_mode=False) -> TranscriptionJob:
+                           threads=None, cli_mode=False) -> TranscriptionJob:
     """Create a TranscriptionJob with all default values
     
     This function handles both CLI and GUI job creation, ensuring all defaults
@@ -704,6 +707,7 @@ def create_transcription_job(audio_file=None, transcript_file=None, start_time=N
         job.pause = 1  # default to '1sec+'
     
     # Config-based options (use defaults from config)
+    job.threads = threads if threads is not None else number_threads
     job.whisper_beam_size = get_config('whisper_beam_size', 1)
     job.whisper_temperature = get_config('whisper_temperature', 0.0)
     job.whisper_compute_type = get_config('whisper_compute_type', 'default')
@@ -760,6 +764,7 @@ def create_job_from_cli_args(args) -> TranscriptionJob:
         timestamps=args.timestamps,
         disfluencies=args.disfluencies,
         pause=args.pause,
+        threads=args.threads,
         cli_mode=True
     )
 
@@ -814,6 +819,8 @@ Examples:
                        help='Exclude disfluencies from transcript')
     parser.add_argument('--pause', choices=['none', '1sec+', '2sec+', '3sec+'], default=None,
                        help='Mark pauses in transcript')
+    parser.add_argument('--threads', type=int, default=None,
+                       help='Number of CPU threads to use for transcription')
     
     return parser.parse_args()
 
@@ -1239,7 +1246,16 @@ class App(ctk.CTk):
             self.check_box_timestamps.select()
         else:
             self.check_box_timestamps.deselect()
-        
+
+        # Threads
+        self.label_threads = ctk.CTkLabel(self.frame_options, text=t('label_threads'))
+        self.label_threads.grid(column=0, row=9, sticky='w', pady=5)
+
+        self.option_menu_threads = ctk.CTkOptionMenu(self.frame_options, width=100,
+                                                     values=[str(i) for i in range(1, cpu_count + 1)])
+        self.option_menu_threads.grid(column=1, row=9, sticky='e', pady=5)
+        self.option_menu_threads.set(str(get_config('last_threads', number_threads)))
+
         # Start control: single CTkOptionMenu styled like a button
         # Create a container so we can show/hide as one control
         self.start_button_container = ctk.CTkFrame(self.sidebar_frame, fg_color='transparent')
@@ -2245,7 +2261,8 @@ class App(ctk.CTk):
                 overlapping=self.check_box_overlapping.get(),
                 timestamps=self.check_box_timestamps.get(),
                 disfluencies=self.check_box_disfluencies.get(),
-                pause=self.option_menu_pause.get(),  # Pass string value
+                pause=self.option_menu_pause.get(),
+                threads=int(self.option_menu_threads.get()),
                 cli_mode=False
             )
             # Handle VTT format warnings in GUI mode
@@ -2984,7 +3001,7 @@ class App(ctk.CTk):
             "model_name_or_path": job.whisper_model,
             "device": 'cpu' if force_whisper_cpu else 'auto',
             "compute_type": job.whisper_compute_type,
-            "cpu_threads": number_threads,
+            "cpu_threads": job.threads,
             "local_files_only": True,
             "audio_path": tmp_audio_file,
             "language_name": job.language_name,
@@ -3249,6 +3266,7 @@ class App(ctk.CTk):
             config['last_overlapping'] = self.check_box_overlapping.get()
             config['last_timestamps'] = self.check_box_timestamps.get()
             config['last_disfluencies'] = self.check_box_disfluencies.get()
+            config['last_threads'] = self.option_menu_threads.get()
             config['force_pyannote_cpu'] = str(force_pyannote_cpu)
             config['force_whisper_cpu'] = str(force_whisper_cpu)
 
@@ -3444,6 +3462,8 @@ if __name__ == "__main__":
                 app.check_box_timestamps.select()
             else:
                 app.check_box_timestamps.deselect()
+        if getattr(args, 'threads', None) is not None:
+            app.option_menu_threads.set(str(args.threads))
 
         # If both files provided, create a job and auto-start in GUI
         if len(app.audio_files_list) > 0 and len(app.transcript_files_list) > 0:

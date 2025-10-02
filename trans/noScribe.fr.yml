@@ -43,6 +43,7 @@ fr:
   label_pause: 'Marquer les pauses :'
   label_timestamps: 'Horodatage :'
   label_disfluencies: 'Mots de remplissage :'
+  label_threads: "Threads CPU:"
   
   start_button: "Démarrer"
   start_queue: 'Démarrer la tâche maintenant'

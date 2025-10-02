@@ -43,6 +43,7 @@ it:
   label_pause: 'Segna le pause:'
   label_timestamps: 'Timestamps:'
   label_disfluencies: 'Disfluenze:'
+  label_threads: "Thread CPU:"
   
   start_button: Avvia
   start_queue: 'Avvia attività ora'

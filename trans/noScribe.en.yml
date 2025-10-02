@@ -45,6 +45,7 @@ en:
   label_pause: 'Mark pause:'
   label_timestamps: 'Timestamps:'
   label_disfluencies: 'Disfluencies:'
+  label_threads: "CPU Threads"
   
   start_button: Start 
   start_queue: 'Start job now'

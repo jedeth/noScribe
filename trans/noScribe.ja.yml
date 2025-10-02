@@ -44,6 +44,7 @@ ja:
   label_pause: 'マークはポーズをとる：'
   label_timestamps: 'タイムスタンプ：'
   label_disfluencies: 'フィラー：'
+  label_threads: "CPUスレッド"
 
   start_button: 開始
   start_queue: '今すぐジョブを開始'

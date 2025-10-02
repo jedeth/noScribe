@@ -44,6 +44,7 @@ pt:
   label_pause: 'Marcar pausas:'
   label_timestamps: 'Registos temporais:'
   label_disfluencies: 'Disfluências:'
+  label_threads: "Threads da CPU:"
   
   start_button: Iniciar
   start_queue: 'Iniciar tarefa agora'

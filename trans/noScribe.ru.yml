@@ -44,6 +44,7 @@ ru:
   label_pause: 'Отметьте паузы:'
   label_timestamps: 'Временные метки:'
   label_disfluencies: 'Паразитные слова:'
+  label_threads: "Потоки процессора:"
   
   start_button: Старт
   start_queue: 'Запустить задание сейчас'

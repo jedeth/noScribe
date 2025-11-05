@@ -3,7 +3,7 @@
 # ported to MAC by Philipp Schneider (gernophil)
 
 # Diarization with PyAnnote (https://github.com/pyannote/pyannote-audio)
-# usage: python diarize.py <device['cpu', 'mps']> <audio file> <output yaml-file>
+# usage: python diarize.py <device['cpu', 'mps', 'cuda', 'xpu']> <audio file> <output yaml-file>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,14 @@ from typing import Any, Mapping, Optional, Text
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
-    
+
+# Try to import Intel Extension for PyTorch for Intel Arc GPU support
+try:
+    import intel_extension_for_pytorch as ipex
+    IPEX_AVAILABLE = True
+except ImportError:
+    IPEX_AVAILABLE = False
+
 app_dir = os.path.abspath(os.path.dirname(__file__))
 os.chdir(app_dir)
 
@@ -74,16 +81,62 @@ class SimpleProgressHook:
         
 # Start Diarization:
 
-try:     
+try:
     if platform.system() == 'Windows':
+        # Check if Intel XPU is requested and available
+        if device == 'xpu':
+            if not IPEX_AVAILABLE:
+                print("log: Intel Extension for PyTorch not found. Install it for Intel Arc GPU support.")
+                print("log: Falling back to CPU.")
+                device = 'cpu'
+            elif not (hasattr(torch, 'xpu') and torch.xpu.is_available()):
+                print("log: Intel XPU requested but not available on this system.")
+                print("log: Falling back to CPU.")
+                device = 'cpu'
+            else:
+                print(f"log: Using Intel XPU (Intel Arc GPU) for diarization")
+                # Optimize models for Intel XPU
+                try:
+                    torch.xpu.empty_cache()
+                except:
+                    pass
+
         pipeline = Pipeline.from_pretrained(os.path.join(app_dir, 'pyannote', 'pyannote_config.yaml'))
         pipeline.to(torch.device(device))
-    elif platform.system() in ("Darwin", "Linux"): # = MAC
+
+        # Apply IPEX optimizations if using XPU
+        if device == 'xpu' and IPEX_AVAILABLE:
+            try:
+                # Optimize the pipeline models for Intel XPU
+                pipeline = ipex.optimize(pipeline)
+                print(f"log: PyAnnote pipeline optimized with Intel Extension for PyTorch")
+            except Exception as e:
+                print(f"log: Could not apply IPEX optimizations: {e}")
+
+    elif platform.system() in ("Darwin", "Linux"): # = MAC or Linux
         if device == 'mps' and not torch.backends.mps.is_available():  # should only happen on x86_64, but checked on all archs to be sure
             device = 'cpu'
             print("log: 'pyannote_xpu: mps' was selected, but mps is not available on this system!")
             print("log: This happens, because availability cannot be checked earlier.")
             print("log: 'pyannote_xpu: cpu' was set.") # The string needs to be the same as in noScribe.py `if line.strip() == "log: 'pyannote_xpu: cpu' was set.":`.
+
+        # Check if Intel XPU is requested on Linux
+        if device == 'xpu':
+            if not IPEX_AVAILABLE:
+                print("log: Intel Extension for PyTorch not found. Install it for Intel Arc GPU support.")
+                print("log: Falling back to CPU.")
+                device = 'cpu'
+            elif not (hasattr(torch, 'xpu') and torch.xpu.is_available()):
+                print("log: Intel XPU requested but not available on this system.")
+                print("log: Falling back to CPU.")
+                device = 'cpu'
+            else:
+                print(f"log: Using Intel XPU (Intel Arc GPU) for diarization")
+                try:
+                    torch.xpu.empty_cache()
+                except:
+                    pass
+
         with open(os.path.join(app_dir, 'pyannote', 'pyannote_config.yaml'), 'r') as yaml_file:
             pyannote_config = yaml.safe_load(yaml_file)
 
@@ -96,6 +149,15 @@ try:
 
         pipeline = Pipeline.from_pretrained(os.path.join(tmpdir.name, 'pyannote_config_macOS.yaml'))
         pipeline.to(torch.device(device))
+
+        # Apply IPEX optimizations if using XPU on Linux
+        if device == 'xpu' and IPEX_AVAILABLE:
+            try:
+                pipeline = ipex.optimize(pipeline)
+                print(f"log: PyAnnote pipeline optimized with Intel Extension for PyTorch")
+            except Exception as e:
+                print(f"log: Could not apply IPEX optimizations: {e}")
+
     else:
         raise Exception('Platform not supported yet.')
 

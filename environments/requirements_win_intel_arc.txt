@@ -1,0 +1,29 @@
+# Installation guide for Windows with Intel Arc GPU
+#
+# Step 1: Install PyTorch with Intel XPU support
+# For Intel Arc GPUs, you need to install PyTorch with XPU backend
+# Visit: https://pytorch.org/get-started/locally/
+# Or use: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/xpu
+#
+# Step 2: Install Intel Extension for PyTorch (IPEX)
+# pip install intel-extension-for-pytorch
+#
+# Step 3: Install Intel GPU drivers
+# Download and install the latest Intel Arc GPU drivers from:
+# https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
+#
+# Step 4: Install the rest of the dependencies
+# pip install -r requirements_win_intel_arc.txt
+#
+# Note: Make sure you have the Intel Graphics Driver installed before running noScribe
+# You may need to restart your computer after installing the drivers
+
+AdvancedHTMLParser
+appdirs
+customtkinter
+faster-whisper
+Pillow
+pyannote.audio>=3.3.2
+pyinstaller
+python-i18n
+PyYAML

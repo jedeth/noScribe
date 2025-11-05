@@ -40,6 +40,12 @@ if platform.system() == 'Windows':
 if platform.system() in ("Windows", "Linux"):
     from ctranslate2 import get_cuda_device_count
     import torch
+    # Try to import Intel Extension for PyTorch for Intel Arc GPU support
+    try:
+        import intel_extension_for_pytorch as ipex
+        IPEX_AVAILABLE = True
+    except ImportError:
+        IPEX_AVAILABLE = False
 import re
 if platform.system() == "Darwin": # = MAC
     from subprocess import check_output
@@ -1028,21 +1034,73 @@ class App(ctk.CTk):
                 xpu = get_config('pyannote_xpu', 'mps' if platform.mac_ver()[0] >= '12.3' else 'cpu')
                 self.pyannote_xpu = 'mps' if xpu == 'mps' else 'cpu'
             elif platform.system() in ('Windows', 'Linux'):
-                # Use cuda if available and not set otherwise in config.yml, fallback to cpu: 
+                # Check for available GPU acceleration: Intel XPU (Arc), NVIDIA CUDA, or CPU
                 cuda_available = torch.cuda.is_available() and get_cuda_device_count() > 0
-                xpu = get_config('pyannote_xpu', 'cuda' if cuda_available else 'cpu')
-                self.pyannote_xpu = 'cuda' if xpu == 'cuda' else 'cpu'
-                whisper_xpu = get_config('whisper_xpu', 'cuda' if cuda_available else 'cpu')
-                self.whisper_xpu = 'cuda' if whisper_xpu == 'cuda' else 'cpu'
+                xpu_available = IPEX_AVAILABLE and hasattr(torch, 'xpu') and torch.xpu.is_available() and torch.xpu.device_count() > 0
+
+                # Determine default device: prioritize xpu (Intel Arc) if available, then cuda, then cpu
+                if xpu_available:
+                    default_device = 'xpu'
+                elif cuda_available:
+                    default_device = 'cuda'
+                else:
+                    default_device = 'cpu'
+
+                xpu = get_config('pyannote_xpu', default_device)
+                self.pyannote_xpu = xpu if xpu in ('cuda', 'xpu', 'cpu') else 'cpu'
+                whisper_xpu = get_config('whisper_xpu', default_device)
+                self.whisper_xpu = whisper_xpu if whisper_xpu in ('cuda', 'xpu', 'cpu') else 'cpu'
             else:
                 raise Exception('Platform not supported yet.')
 
-            # log CPU capabilities
+            # log CPU and GPU capabilities
             self.logn("=== CPU FEATURES ===", where="file")
             if platform.system() == 'Windows':
                 self.logn("System: Windows", where="file")
                 for key, value in cpufeature.CPUFeature.items():
                     self.logn('    {:24}: {}'.format(key, value), where="file")
+                # Log GPU detection for Windows
+                self.logn("\n=== GPU ACCELERATION ===", where="file")
+                if xpu_available:
+                    try:
+                        gpu_name = torch.xpu.get_device_name(0)
+                        gpu_vram = torch.xpu.get_device_properties(0).total_memory / (1024**3)
+                        self.logn(f"Intel GPU detected: {gpu_name}", where="file")
+                        self.logn(f"VRAM: {gpu_vram:.2f} GB", where="file")
+                        self.logn(f"Using Intel XPU (Intel Arc) for acceleration", where="file")
+                        self.logn(f"PyAnnote device: {self.pyannote_xpu}", where="file")
+                        self.logn(f"Whisper device: {self.whisper_xpu}", where="file")
+                    except Exception as e:
+                        self.logn(f"Intel XPU detected but error getting details: {e}", where="file")
+                elif cuda_available:
+                    self.logn(f"NVIDIA CUDA detected", where="file")
+                    self.logn(f"PyAnnote device: {self.pyannote_xpu}", where="file")
+                    self.logn(f"Whisper device: {self.whisper_xpu}", where="file")
+                else:
+                    self.logn(f"No GPU acceleration available, using CPU", where="file")
+                    self.logn(f"Performance will be slower. Consider installing Intel Extension for PyTorch for Intel Arc GPU support.", where="file")
+            elif platform.system() == "Linux":
+                self.logn(f"System: Linux", where="file")
+                # Log GPU detection for Linux
+                self.logn("\n=== GPU ACCELERATION ===", where="file")
+                if xpu_available:
+                    try:
+                        gpu_name = torch.xpu.get_device_name(0)
+                        gpu_vram = torch.xpu.get_device_properties(0).total_memory / (1024**3)
+                        self.logn(f"Intel GPU detected: {gpu_name}", where="file")
+                        self.logn(f"VRAM: {gpu_vram:.2f} GB", where="file")
+                        self.logn(f"Using Intel XPU (Intel Arc) for acceleration", where="file")
+                        self.logn(f"PyAnnote device: {self.pyannote_xpu}", where="file")
+                        self.logn(f"Whisper device: {self.whisper_xpu}", where="file")
+                    except Exception as e:
+                        self.logn(f"Intel XPU detected but error getting details: {e}", where="file")
+                elif cuda_available:
+                    self.logn(f"NVIDIA CUDA detected", where="file")
+                    self.logn(f"PyAnnote device: {self.pyannote_xpu}", where="file")
+                    self.logn(f"Whisper device: {self.whisper_xpu}", where="file")
+                else:
+                    self.logn(f"No GPU acceleration available, using CPU", where="file")
+                    self.logn(f"Performance will be slower. Consider installing Intel Extension for PyTorch for Intel Arc GPU support.", where="file")
             elif platform.system() == "Darwin": # = MAC
                 self.logn(f"System: MAC {platform.machine()}", where="file")
                 if platform.mac_ver()[0] >= '12.3': # MPS needs macOS 12.3+
@@ -1353,14 +1411,21 @@ class App(ctk.CTk):
                     if platform.system() == "Darwin": # = MAC
                         whisper_device = 'auto'
                     elif platform.system() in ('Windows', 'Linux'):
-                        whisper_device = 'cpu'
                         whisper_device = self.whisper_xpu
+                        # Note: faster-whisper (CTranslate2) doesn't support Intel XPU directly
+                        # For Intel Arc GPUs, we use XPU for PyAnnote and CPU for Whisper
+                        # faster-whisper with CPU is already highly optimized with CTranslate2
+                        if whisper_device == 'xpu':
+                            self.logn("Note: faster-whisper doesn't support Intel XPU directly", where="file")
+                            self.logn("Using optimized CPU inference for Whisper (CTranslate2)", where="file")
+                            self.logn("Intel XPU acceleration is used for PyAnnote diarization", where="file")
+                            whisper_device = 'cpu'
                     else:
                         raise Exception('Platform not supported yet.')
                     model = WhisperModel(self.whisper_model,
-                                         device=whisper_device,  
-                                         cpu_threads=number_threads, 
-                                         compute_type=self.whisper_compute_type, 
+                                         device=whisper_device,
+                                         cpu_threads=number_threads,
+                                         compute_type=self.whisper_compute_type,
                                          local_files_only=True)
                     self.logn('model loaded', where='file')
 

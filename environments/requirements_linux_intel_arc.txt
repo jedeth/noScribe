@@ -1,0 +1,31 @@
+# Installation guide for Linux with Intel Arc GPU
+#
+# Step 1: Install Intel GPU compute runtime
+# Follow the instructions at: https://dgpu-docs.intel.com/driver/installation.html
+# For Ubuntu/Debian:
+#   wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | sudo gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg
+#   echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy client" | sudo tee /etc/apt/sources.list.d/intel-gpu-jammy.list
+#   sudo apt-get update
+#   sudo apt-get install -y intel-opencl-icd intel-level-zero-gpu level-zero intel-media-va-driver-non-free libmfx1 libmfxgen1 libvpl2
+#
+# Step 2: Install PyTorch with Intel XPU support
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/xpu
+#
+# Step 3: Install Intel Extension for PyTorch (IPEX)
+# pip install intel-extension-for-pytorch
+#
+# Step 4: Install the rest of the dependencies
+# pip install -r requirements_linux_intel_arc.txt
+#
+# Step 5: Verify installation
+# Run: python -c "import torch; import intel_extension_for_pytorch as ipex; print(f'XPU available: {torch.xpu.is_available()}'); print(f'XPU device count: {torch.xpu.device_count()}')"
+
+AdvancedHTMLParser
+appdirs
+customtkinter
+faster-whisper
+Pillow
+pyannote.audio>=3.3.2
+pyinstaller
+python-i18n
+PyYAML

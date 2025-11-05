@@ -49,6 +49,15 @@ if platform.system() == "Darwin": # = MAC
 from faster_whisper.audio import decode_audio
 from faster_whisper.vad import VadOptions, get_speech_timestamps
 import AdvancedHTMLParser
+
+# Try importing OpenVINO backend for Intel optimization
+try:
+    from whisper_openvino import WhisperOpenVINO, should_use_openvino
+    OPENVINO_AVAILABLE = True
+except ImportError:
+    OPENVINO_AVAILABLE = False
+    WhisperOpenVINO = None
+    should_use_openvino = lambda: False
 import html
 from threading import Thread
 import time
@@ -1349,7 +1358,7 @@ class App(ctk.CTk):
                             self.last_auto_save = datetime.datetime.now()
 
                 try:
-                    from faster_whisper import WhisperModel
+                    # Determine device
                     if platform.system() == "Darwin": # = MAC
                         whisper_device = 'auto'
                     elif platform.system() in ('Windows', 'Linux'):
@@ -1357,12 +1366,36 @@ class App(ctk.CTk):
                         whisper_device = self.whisper_xpu
                     else:
                         raise Exception('Platform not supported yet.')
-                    model = WhisperModel(self.whisper_model,
-                                         device=whisper_device,  
-                                         cpu_threads=number_threads, 
-                                         compute_type=self.whisper_compute_type, 
-                                         local_files_only=True)
-                    self.logn('model loaded', where='file')
+
+                    # Check if OpenVINO should be used for Intel optimization
+                    use_openvino = False
+                    if OPENVINO_AVAILABLE and should_use_openvino():
+                        # Only use OpenVINO on CPU/GPU, not CUDA (CUDA is already optimized)
+                        if whisper_device in ('cpu', 'auto') or 'cuda' not in whisper_device.lower():
+                            use_openvino = True
+                            self.logn('🚀 Intel hardware detected - using OpenVINO for 2-6x speedup', where='file')
+
+                    if use_openvino:
+                        # Use OpenVINO-optimized backend for Intel CPUs/GPUs
+                        model = WhisperOpenVINO(
+                            self.whisper_model,
+                            device=whisper_device,
+                            cpu_threads=number_threads,
+                            compute_type=self.whisper_compute_type,
+                            local_files_only=True
+                        )
+                        self.logn('OpenVINO model loaded', where='file')
+                    else:
+                        # Use standard faster-whisper backend
+                        from faster_whisper import WhisperModel
+                        model = WhisperModel(
+                            self.whisper_model,
+                            device=whisper_device,
+                            cpu_threads=number_threads,
+                            compute_type=self.whisper_compute_type,
+                            local_files_only=True
+                        )
+                        self.logn('faster-whisper model loaded', where='file')
 
                     if self.cancel:
                         raise Exception(t('err_user_cancelation')) 
@@ -1453,14 +1486,14 @@ class App(ctk.CTk):
                     gc.collect()
                     
                     segments, info = model.transcribe(
-                        self.tmp_audio_file, # audio, 
+                        self.tmp_audio_file, # audio,
                         language=whisper_lang,
-                        multilingual=multilingual, 
-                        beam_size=5, 
-                        #temperature=self.whisper_temperature, 
-                        word_timestamps=True, 
+                        multilingual=multilingual,
+                        beam_size=self.whisper_beam_size,  # Use config value instead of hardcoded 5
+                        temperature=self.whisper_temperature,  # Use config value
+                        word_timestamps=True,
                         #initial_prompt=self.prompt,
-                        hotwords=self.prompt, 
+                        hotwords=self.prompt,
                         vad_filter=True,
                         vad_parameters=vad_parameters,
                         # length_penalty=0.5

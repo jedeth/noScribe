@@ -9,3 +9,11 @@ pyannote.audio>=3.3.2
 pyinstaller
 python-i18n
 PyYAML
+
+# OpenVINO dependencies for Intel CPU/GPU optimization (optional but recommended for Intel hardware)
+# Provides 2-6x speedup on Intel CPUs and integrated GPUs
+openvino>=2025.0
+openvino-genai
+optimum[openvino]
+nncf
+librosa

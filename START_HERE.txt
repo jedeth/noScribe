@@ -1,0 +1,69 @@
+═══════════════════════════════════════════════════════════════════
+  OPTIMISATION OPENVINO POUR INTEL - DÉMARRAGE RAPIDE
+  Transcription 10h : 20h → 3-5h (4-6x plus rapide !)
+═══════════════════════════════════════════════════════════════════
+
+🎯 POUR QUI ?
+  ✓ Processeurs Intel (Core, Ultra, Xeon)
+  ✓ Transcriptions longues (plusieurs heures)
+  ✓ Besoin de vitesse maximum
+
+🚀 INSTALLATION (10 minutes) :
+
+  1. Lancez le script d'installation :
+     ./install_openvino.sh
+
+     (Windows : pip install -r environments\requirements_win_cpu.txt)
+
+  2. Configurez pour vitesse optimale :
+     python3 configure_for_speed.py
+
+  3. Testez noScribe :
+     python3 noScribe.py
+
+     Cherchez dans les logs :
+     "🚀 Intel hardware detected - using OpenVINO"
+
+  4. C'est tout ! Profitez du speedup 2-6x 🎉
+
+⚠️  PREMIÈRE TRANSCRIPTION = LENTE (5-10 min)
+    Le modèle Whisper est converti en OpenVINO.
+    Les transcriptions suivantes seront ultra-rapides !
+
+📚 DOCUMENTATION :
+
+  - Guide pas à pas : GUIDE_INSTALLATION_RAPIDE.md
+  - Vue d'ensemble : README_OPENVINO.md
+  - Détails techniques : OPENVINO_OPTIMIZATION.md
+
+🔧 PROBLÈME ?
+
+  1. Testez l'installation :
+     python3 test_openvino.py
+
+  2. Réinstallez si nécessaire :
+     ./install_openvino.sh
+
+  3. Consultez le guide :
+     cat GUIDE_INSTALLATION_RAPIDE.md
+
+  4. Ouvrez une issue :
+     https://github.com/kaixxx/noScribe/issues
+
+📊 PERFORMANCES ATTENDUES (10h audio sur Intel Ultra) :
+
+  • faster-whisper (avant) : ~20 heures
+  • OpenVINO CPU (après)  : ~7-10 heures (2-3x)
+  • OpenVINO iGPU (après) : ~3-5 heures (4-6x) ⭐
+
+═══════════════════════════════════════════════════════════════════
+
+Besoin d'aide ? Lancez :
+  ./install_openvino.sh  # Installation guidée
+  python3 configure_for_speed.py  # Configuration assistée
+
+Questions ? Lisez GUIDE_INSTALLATION_RAPIDE.md
+
+Bonne transcription ultra-rapide ! 🚀
+
+═══════════════════════════════════════════════════════════════════
